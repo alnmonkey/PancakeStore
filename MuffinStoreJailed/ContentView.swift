@@ -74,31 +74,6 @@ struct ContentView: View {
                                 .textFieldStyle(GlassyTextFieldStyle())
                         }
                     }
-                    Button(action: {
-                        Haptic.shared.play(.soft)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                            if appleId.isEmpty || password.isEmpty {
-                                Alertinator.shared.alert(title: "No Apple ID details were input!", body: "Please type your Apple ID email address & password, then try again.")
-                            }
-                            if code.isEmpty {
-                                ipaTool = IPATool(appleId: appleId, password: password)
-                                ipaTool?.authenticate(requestCode: true)
-                                hasSent2FACode = true
-                                return
-                            }
-                            let finalPassword = password + code
-                            ipaTool = IPATool(appleId: appleId, password: finalPassword)
-                            let ret = ipaTool?.authenticate()
-                            isAuthenticated = ret ?? false
-                        }
-                    }) {
-                        if hasSent2FACode {
-                            LabelStyle(text: "Log In", icon: "arrow.right")
-                        } else {
-                            LabelStyle(text: "Send 2FA Code", icon: "key")
-                        }
-                    }
-                    .buttonStyle(GlassyButtonStyle(isDisabled: hasSent2FACode ? code.isEmpty : false))
                 } else {
                     // downgrading application view
                     if isDowngrading {
@@ -113,15 +88,6 @@ struct ContentView: View {
                                 }
                             }
                         }
-                        Button(action: {
-                            Haptic.shared.play(.heavy)
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                                exitinator()
-                            }
-                        }) {
-                            LabelStyle(text: "Go to Home Screen", icon: "house")
-                        }
-                        .buttonStyle(GlassyButtonStyle(isDisabled: !sharedData.hasAppBeenServed))
                     } else {
                         // input the stupid app link or whatever view
                         Section(header: HeaderStyle(text: "Downgrade App", icon: "arrow.down.app"), footer: Text("Created by [mineek](https://github.com/mineek/MuffinStoreJailed-Public), UI modifications done by lunginspector for [jailbreak.party](https://github.com/jailbreakdotparty). Use this tool at your own risk! App data may be lost, and other damage could occur.")) {
@@ -140,8 +106,51 @@ struct ContentView: View {
                                 .frame(width: 50)
                             }
                         }
-                        
-                        VStack {
+                    }
+                }
+            }
+            .navigationTitle("PancakeStore")
+            .safeAreaInset(edge: .bottom) {
+                VStack {
+                    // i hate this.
+                    if !isAuthenticated {
+                        Button(action: {
+                            Haptic.shared.play(.soft)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                if appleId.isEmpty || password.isEmpty {
+                                    Alertinator.shared.alert(title: "No Apple ID details were input!", body: "Please type your Apple ID email address & password, then try again.")
+                                }
+                                if code.isEmpty {
+                                    ipaTool = IPATool(appleId: appleId, password: password)
+                                    ipaTool?.authenticate(requestCode: true)
+                                    hasSent2FACode = true
+                                    return
+                                }
+                                let finalPassword = password + code
+                                ipaTool = IPATool(appleId: appleId, password: finalPassword)
+                                let ret = ipaTool?.authenticate()
+                                isAuthenticated = ret ?? false
+                            }
+                        }) {
+                            if hasSent2FACode {
+                                LabelStyle(text: "Log In", icon: "arrow.right")
+                            } else {
+                                LabelStyle(text: "Send 2FA Code", icon: "key")
+                            }
+                        }
+                        .buttonStyle(GlassyButtonStyle(isDisabled: hasSent2FACode ? code.isEmpty : false, isMaterialButton: true))
+                    } else {
+                        if isDowngrading {
+                            Button(action: {
+                                Haptic.shared.play(.heavy)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                    exitinator()
+                                }
+                            }) {
+                                LabelStyle(text: "Go to Home Screen", icon: "house")
+                            }
+                            .buttonStyle(GlassyButtonStyle(isDisabled: !sharedData.hasAppBeenServed, isMaterialButton: true))
+                        } else {
                             Button(action: {
                                 Haptic.shared.play(.soft)
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -163,7 +172,7 @@ struct ContentView: View {
                             }) {
                                 LabelStyle(text: "Downgrade App", icon: "arrow.down")
                             }
-                            .buttonStyle(GlassyButtonStyle())
+                            .buttonStyle(GlassyButtonStyle(isMaterialButton: true))
                             
                             Button(action: {
                                 Haptic.shared.play(.heavy)
@@ -177,12 +186,14 @@ struct ContentView: View {
                             }) {
                                 LabelStyle(text: "Log Out & Exit", icon: "xmark")
                             }
-                            .buttonStyle(GlassyButtonStyle(color: .red))
+                            .buttonStyle(GlassyButtonStyle(color: .red, isMaterialButton: true))
                         }
                     }
                 }
+                .padding(.horizontal, 25)
+                .padding(.top, 30)
+                .background(VariableBlurView(maxBlurRadius: 5, direction: .blurredBottomClearTop).ignoresSafeArea())
             }
-            .navigationTitle("PancakeStore")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: {
