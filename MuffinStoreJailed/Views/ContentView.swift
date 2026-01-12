@@ -7,6 +7,7 @@
 
 import SwiftUI
 import PartyUI
+import DeviceKit
 
 struct ContentView: View {
     @State var ipaTool: IPATool?
@@ -21,17 +22,38 @@ struct ContentView: View {
     @State var appLink: String = ""
     
     @State var hasSent2FACode: Bool = false
-    @State var showLogs: Bool = false
-    @State var showPassword: Bool = false
+    @State private var hasShownWelcome: Bool = false
     
-    @ObservedObject var sharedData = SharedData.shared
+    @State var showLogs: Bool = true
+    @State var showPassword: Bool = false
+    @State var showSettingsView: Bool = false
+    
+    @EnvironmentObject var appData: AppData
     
     var body: some View {
         NavigationStack {
             List {
-                if showLogs {
+                if showLogs || weOnADebugBuild {
                     Section(header: ButtonLabel(text: "Logs", icon: "terminal")) {
-                        TerminalContainer(content: LogView())
+                        VStack(alignment: .leading) {
+                            HStack {
+                                if appData.applicationIcon == "showMeProgressPlease" {
+                                    ProgressView()
+                                        .offset(y: 1)
+                                } else {
+                                    Image(systemName: appData.applicationIcon)
+                                        .foregroundStyle(appData.applicationIconColor)
+                                }
+                                Text(appData.applicationStatus)
+                                    .fontWeight(.semibold)
+                            }
+                            TerminalContainer(content: LogView())
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .modifier(DynamicGlassEffect(shape: AnyShape(.rect(cornerRadius: backgroundCornerRadius())), useBackground: false))
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(.zeroInsets)
                     }
                 }
                 // login page view
@@ -76,14 +98,51 @@ struct ContentView: View {
                 } else {
                     // downgrading application view
                     if isDowngrading {
-                        Section {
-                            HStack(spacing: 12) {
-                                ProgressView()
-                                VStack(alignment: .leading) {
-                                    Text("Downgrading Application...")
-                                        .fontWeight(.medium)
-                                    Text("This may take a while, and PancakeStore will likely hang for a bit.")
-                                        .font(.footnote)
+                        Section(header: HeaderLabel(text: "App Info", icon: "info.circle")) {
+                            LabeledContent {
+                                if appLink.isEmpty {
+                                    ProgressView()
+                                } else {
+                                    Text(appLink)
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: "link")
+                                        .frame(width: 24, alignment: .center)
+                                    Text("App Store Link")
+                                }
+                            }
+                            .contextMenu {
+                                Button(action: {
+                                    UIPasteboard.general.string = appLink
+                                }) {
+                                    Label("Copy Link", systemImage: "link")
+                                }
+                            }
+                            LabeledContent {
+                                if appData.appBundleID.isEmpty {
+                                    ProgressView()
+                                } else {
+                                    Text(appData.appBundleID)
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: "shippingbox")
+                                        .frame(width: 24, alignment: .center)
+                                    Text("App Bundle ID")
+                                }
+                            }
+                            LabeledContent {
+                                if appData.appVersion.isEmpty {
+                                    ProgressView()
+                                } else {
+                                    Text(appData.appVersion)
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: "arrow.down.app")
+                                        .frame(width: 24, alignment: .center)
+                                    Text("Target App Version")
                                 }
                             }
                         }
@@ -110,25 +169,32 @@ struct ContentView: View {
             }
             .navigationTitle("PancakeStore")
             .safeAreaInset(edge: .bottom) {
-                OverlayButtonContainer(content: VStack(spacing: 12) {
+                VStack {
                     // i hate this.
                     if !isAuthenticated {
                         Button(action: {
                             Haptic.shared.play(.soft)
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                                 if appleId.isEmpty || password.isEmpty {
-                                    Alertinator.shared.alert(title: "No Apple ID details were input!", body: "Please type your Apple ID email address & password, then try again.")
+                                    Alertinator.shared.alert(title: "No Apple ID details were input!", body: "Please type both your Apple ID email address & password, then try again.")
+                                } else {
+                                    if code.isEmpty {
+                                        ipaTool = IPATool(appleId: appleId, password: password)
+                                        ipaTool?.authenticate(requestCode: true)
+                                        hasSent2FACode = true
+                                        return
+                                    }
+                                    let finalPassword = password + code
+                                    ipaTool = IPATool(appleId: appleId, password: finalPassword)
+                                    let ret = ipaTool?.authenticate()
+                                    isAuthenticated = ret ?? false
+                                    
+                                    if isAuthenticated {
+                                        appData.applicationStatus = "Ready to Downgrade!"
+                                        appData.applicationIcon = "checkmark.circle.fill"
+                                        appData.applicationIconColor = .primary
+                                    }
                                 }
-                                if code.isEmpty {
-                                    ipaTool = IPATool(appleId: appleId, password: password)
-                                    ipaTool?.authenticate(requestCode: true)
-                                    hasSent2FACode = true
-                                    return
-                                }
-                                let finalPassword = password + code
-                                ipaTool = IPATool(appleId: appleId, password: finalPassword)
-                                let ret = ipaTool?.authenticate()
-                                isAuthenticated = ret ?? false
                             }
                         }) {
                             if hasSent2FACode {
@@ -141,6 +207,15 @@ struct ContentView: View {
                     } else {
                         if isDowngrading {
                             Button(action: {
+                                Haptic.shared.play(.soft)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                    LSApplicationWorkspace.default().openApplication(withBundleID: "com.jbdotparty.PancakeStore2")
+                                }
+                            }) {
+                                ButtonLabel(text: "Open App", icon: "arrow.up.forward.app")
+                            }
+                            .buttonStyle(GlassyButtonStyle(isDisabled: !appData.hasAppBeenServed, isMaterialButton: true))
+                            Button(action: {
                                 Haptic.shared.play(.heavy)
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                                     exitinator()
@@ -148,7 +223,7 @@ struct ContentView: View {
                             }) {
                                 ButtonLabel(text: "Go to Home Screen", icon: "house")
                             }
-                            .buttonStyle(GlassyButtonStyle(isDisabled: !sharedData.hasAppBeenServed, isMaterialButton: true))
+                            .buttonStyle(GlassyButtonStyle(isDisabled: !appData.hasAppBeenServed, color: .blue, isMaterialButton: true))
                         } else {
                             Button(action: {
                                 Haptic.shared.play(.soft)
@@ -167,6 +242,8 @@ struct ContentView: View {
                                     print("App ID: \(appLinkParsed)")
                                     isDowngrading = true
                                     downgradeApp(appId: appLinkParsed, ipaTool: ipaTool!)
+                                    appData.applicationStatus = "Downgrading Application..."
+                                    appData.applicationIcon = "showMeProgressPlease"
                                 }
                             }) {
                                 ButtonLabel(text: "Downgrade App", icon: "arrow.down")
@@ -188,7 +265,8 @@ struct ContentView: View {
                             .buttonStyle(GlassyButtonStyle(color: .red, isMaterialButton: true))
                         }
                     }
-                })
+                }
+                .modifier(OverlayBackground())
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -199,11 +277,24 @@ struct ContentView: View {
                         Image(systemName: "terminal")
                     }
                 }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: {
+                        showSettingsView.toggle()
+                    }) {
+                        Image(systemName: "gearshape")
+                    }
+                }
+            }
+            .sheet(isPresented: $showSettingsView) {
+                SettingsView()
             }
             .onAppear {
                 isAuthenticated = EncryptedKeychainWrapper.hasAuthInfo()
                 print("Found \(isAuthenticated ? "auth" : "no auth") info in keychain")
                 if isAuthenticated {
+                    appData.applicationStatus = "Ready to Downgrade!"
+                    appData.applicationIcon = "checkmark.circle.fill"
+                    appData.applicationIconColor = .primary
                     guard let authInfo = EncryptedKeychainWrapper.getAuthInfo() else {
                         print("Failed to get auth info from keychain, logging out")
                         isAuthenticated = false
@@ -227,4 +318,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(AppData())
 }

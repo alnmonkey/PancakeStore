@@ -24,7 +24,7 @@ struct SafariWebView: UIViewControllerRepresentable {
 }
 
 func downgradeAppToVersion(appId: String, versionId: String, ipaTool: IPATool) {
-    @ObservedObject var sharedData = SharedData.shared
+    @ObservedObject var appData = AppData.shared
     
     let path = ipaTool.downloadIPAForVersion(appId: appId, appVerId: versionId)
     print("IPA downloaded to \(path)")
@@ -51,6 +51,9 @@ func downgradeAppToVersion(appId: String, versionId: String, ipaTool: IPATool) {
     print("appBundleId: \(appBundleId)")
     print("appVersion: \(appVersion)")
 
+    appData.appBundleID = appBundleId
+    appData.appVersion = appVersion
+    
     let finalURL = "https://api.palera.in/genPlist?bundleid=\(appBundleId)&name=\(appBundleId)&version=\(appVersion)&fetchurl=http://127.0.0.1:9090/signed.ipa"
     let installURL = "itms-services://?action=download-manifest&url=" + finalURL.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!
     
@@ -65,7 +68,10 @@ func downgradeAppToVersion(appId: String, versionId: String, ipaTool: IPATool) {
 
         server.route(.GET, "install", { _ in
             print("Serving install page")
-            sharedData.hasAppBeenServed = true
+            appData.hasAppBeenServed = true
+            appData.applicationStatus = "Downgraded \(appBundleId) successfully!"
+            appData.applicationIcon = "checkmark.circle.fill"
+            appData.applicationIconColor = .green
             let installPage = """
             <script type="text/javascript">
                 window.location = "\(installURL)"

@@ -7,26 +7,42 @@
 
 import SwiftUI
 
-final class SharedData: ObservableObject {
-    static let shared = SharedData()
+final class AppData: ObservableObject {
+    static let shared = AppData()
+    
+    @Published var applicationIcon: String = "xmark.circle.fill"
+    @Published var applicationIconColor: Color = .red
+    @Published var applicationStatus: String = "Not logged in"
+    
+    @Published var appBundleID: String = ""
+    @Published var appVersion: String = ""
     
     @Published var hasAppBeenServed: Bool = false
 }
 
 var pipe = Pipe()
 var sema = DispatchSemaphore(value: 0)
+var weOnADebugBuild: Bool = false
 
 @main
 struct MuffinStoreJailedApp: App {
+    @StateObject private var appData = AppData.shared
+    
     init() {
         // Setup log stuff (redirect stdout)
         setvbuf(stdout, nil, _IONBF, 0)
         dup2(pipe.fileHandleForWriting.fileDescriptor, STDOUT_FILENO)
+        #if DEBUG
+        weOnADebugBuild = true
+        #else
+        weOnADebugBuild = false
+        #endif
     }
     
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(appData)
         }
     }
 }
