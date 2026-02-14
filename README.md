@@ -1,6 +1,10 @@
 ![Artboard](https://github.com/jailbreakdotparty/PancakeStore/blob/main/previewIcon.png)
+
 # PancakeStore
-**MuffinStore Jailed, but with a proper UI. iOS 16.4 and later.**
+>[!WARNING]
+>This tool is currently broken, and I have no plans nor skills to fix the issue. I am open to any pull requests or help, but for now, consider this tool **dead**. PancakeStore has a very similar backend to ipatool, and it's currently facing [this](https://github.com/majd/ipatool/issues/437) issue.
+
+~~**MuffinStore Jailed, but with a proper UI. iOS 16.4 and later.**~~
 
 [Latest Release](https://github.com/jailbreakdotparty/PancakeStore/releases/latest) • [Support Server](https://jailbreak.party/discord) • [Website](https://jailbreak.party) • [Original Project (by mineek)](https://github.com/mineek/MuffinStoreJailed-Public)
 >[!WARNING]
@@ -23,4 +27,4 @@
 - **App crashes when trying to log in:** You likely input the wrong 2FA code. Kill the app from the app switcher and try again.
 - **App doesn't progress when clicking "log in":** You likely input the wrong Apple ID and/or Password. Kill the app from the app switcher and try again.
 - **I don't receive a 2FA code when clicking "Authenticate":** Type six random numbers into the field and log in. This likely works because you had logged into MuffinStoreJailed or PancakeStore in the past, even on a different device.
-- **The app crashes when I try to downgrade:** You likely did not purchase (download) the app in the past. Download the app beforehand and remove it, or purchase it from another device. 
+- **The app crashes when I try to downgrade:** You likely did not purchase (download) the app in the past. Download the app beforehand and remove it, or purchase it from another device.
