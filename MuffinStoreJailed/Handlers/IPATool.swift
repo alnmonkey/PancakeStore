@@ -48,6 +48,7 @@ class StoreClient {
     var accountName: String?
     var authHeaders: [String: String]?
     var authCookies: [HTTPCookie]?
+    var pod: String?
 
     init(appleId: String, password: String) {
         session = URLSession.shared
@@ -57,6 +58,7 @@ class StoreClient {
         self.accountName = nil
         self.authHeaders = nil
         self.authCookies = nil
+        self.pod = nil
     }
 
     func generateGuid(appleId: String) -> String {
@@ -84,7 +86,8 @@ class StoreClient {
             "guid": guid,
             "accountName": accountName,
             "authHeaders": authHeaders,
-            "authCookies": authCookiesEnc
+            "authCookies": authCookiesEnc,
+            "pod": pod
         ]
         var data = try! JSONSerialization.data(withJSONObject: out, options: [])
         var base64 = data.base64EncodedString()
@@ -103,11 +106,51 @@ class StoreClient {
             var authCookiesEnc = out["authCookies"] as! String
             var authCookiesEnc1 = Data(base64Encoded: authCookiesEnc)!
             authCookies = NSKeyedUnarchiver.unarchiveObject(with: authCookiesEnc1) as? [HTTPCookie]
+            pod = out["pod"] as? String
             print("Loaded auth info")
             return true
         }
         print("No auth info found, need to authenticate")
         return false
+    }
+    
+    // pancakestore is saved! thanks ipatool!
+    // admittedly i kinda owe this hoorah to that vibecoded ass pull-request, i had to stoop to its level too :(
+    // oh well. - skadz, 2.24.26
+    func getBagEndpoint() async -> String {
+        let fallback = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate" // this is the old broken one, i'm just gonna have it as a fallback in case this amazingness somehow fails one day
+        
+        if guid == nil {
+            guid = generateGuid(appleId: appleId)
+        }
+        guard let guid = guid else { return fallback }
+
+        var request = URLRequest(url: URL(string: "https://init.itunes.apple.com/bag.xml?guid=\(guid)")!)
+        request.httpMethod = "GET"
+        request.setValue("application/xml", forHTTPHeaderField: "Accept")
+        request.setValue("Configurator/2.17 (Macintosh; OS X 15.2; 24C5089c) AppleWebKit/0620.1.16.11.6", forHTTPHeaderField: "User-Agent")
+
+        do {
+            let (data, _) = try await URLSession.shared.data(for: request)
+            guard !data.isEmpty else { return fallback }
+
+            // i'm sorry i'm sorry please don't hit me i know i know
+            if let xmlString = String(data: data, encoding: .utf8),
+               let plistStart = xmlString.range(of: "<plist"),
+               let plistEnd = xmlString.range(of: "</plist>") {
+                let plistSection = String(xmlString[plistStart.lowerBound..<plistEnd.upperBound])
+                if let cleanData = plistSection.data(using: .utf8),
+                   let plist = try PropertyListSerialization.propertyList(from: cleanData, options: [], format: nil) as? [String: Any],
+                   let urlBag = plist["urlBag"] as? [String: Any],
+                   let endpoint = urlBag["authenticateAccount"] as? String {
+                    return endpoint
+                }
+            }
+        } catch {
+            print("failed to get bag endpoint!! \(error)")
+        }
+
+        return fallback
     }
 
     func authenticate(requestCode: Bool = false) -> Bool {
@@ -122,76 +165,85 @@ class StoreClient {
             "rmp": "0",
             "why": "signIn"
         ]
-
-        var url = URL(string: "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.allHTTPHeaderFields = [
-            "Accept": "*/*",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "Configurator/2.17 (Macintosh; OS X 15.2; 24C5089c) AppleWebKit/0620.1.16.11.6"
-        ]
-
-        var ret = false
-        
-        for attempt in 1...4 {
-            req["attempt"] = String(attempt)
-            request.httpBody = try! JSONSerialization.data(withJSONObject: req, options: [])
-            let datatask = session.dataTask(with: request) { (data, response, error) in
-                if let error = error {
-                    print("error 1 \(error.localizedDescription)")
-                    return
-                }
-                if let response = response {
-//                    print("Response: \(response)")
-                    if let response = response as? HTTPURLResponse {
-                        print("New URL: \(response.url!)")
-                        request.url = response.url
+        Task {
+            let authURL = await getBagEndpoint()
+            
+            let url = URL(string: authURL)!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.allHTTPHeaderFields = [
+                "Accept": "*/*",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "Configurator/2.17 (Macintosh; OS X 15.2; 24C5089c) AppleWebKit/0620.1.16.11.6"
+            ]
+            
+            var ret = false
+            
+            for attempt in 1...4 {
+                req["attempt"] = String(attempt)
+                request.httpBody = try! JSONSerialization.data(withJSONObject: req, options: [])
+                let datatask = session.dataTask(with: request) { (data, response, error) in
+                    if let error = error {
+                        print("error 1 \(error.localizedDescription)")
+                        return
                     }
-                }
-                if let data = data {
-                    do {
-                        let resp = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as! [String: Any]
-                        if resp["m-allowed"] as! Bool {
-                            print("Authentication successful")
-                            var download_queue_info = resp["download-queue-info"] as! [String: Any]
-                            var dsid = download_queue_info["dsid"] as! Int
-                            var httpResp = response as! HTTPURLResponse
-                            var storeFront = httpResp.value(forHTTPHeaderField: "x-set-apple-store-front")
-                            print("Store front: \(storeFront!)")
-                            self.authHeaders = [
-                                "X-Dsid": String(dsid),
-                                "iCloud-Dsid": String(dsid),
-                                "X-Apple-Store-Front": storeFront!,
-                                "X-Token": resp["passwordToken"] as! String
-                            ]
-                            self.authCookies = self.session.configuration.httpCookieStorage?.cookies
-                            var accountInfo = resp["accountInfo"] as! [String: Any]
-                            var address = accountInfo["address"] as! [String: String]
-                            self.accountName = address["firstName"]! + " " + address["lastName"]!
-                            self.saveAuthInfo()
-                            ret = true
-                        } else {
-                            print("Authentication failed: \(resp["customerMessage"] as! String)")
+                    if let response = response {
+                        //                    print("Response: \(response)")
+                        if let response = response as? HTTPURLResponse {
+                            print("New URL: \(response.url!)")
+                            request.url = response.url
+                            
+                            if let pod = response.value(forHTTPHeaderField: "pod") {
+                                print("pod gotten: \(pod)")
+                                self.pod = pod
+                            }
                         }
-                    } catch {
-                        print("Error: \(error)")
+                    }
+                    if let data = data {
+                        do {
+                            let resp = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as! [String: Any]
+                            if let dsPersonId = resp["dsPersonId"] as? String, let passwordToken = resp["passwordToken"] as? String, !dsPersonId.isEmpty, !passwordToken.isEmpty {
+                                print("Authentication successful")
+                                var download_queue_info = resp["download-queue-info"] as! [String: Any]
+                                var dsid = download_queue_info["dsid"] as! Int
+                                var httpResp = response as! HTTPURLResponse
+                                var storeFront = httpResp.value(forHTTPHeaderField: "x-set-apple-store-front")
+                                print("Store front: \(storeFront!)")
+                                self.authHeaders = [
+                                    "X-Dsid": String(dsid),
+                                    "iCloud-Dsid": String(dsid),
+                                    "X-Apple-Store-Front": storeFront!,
+                                    "X-Token": resp["passwordToken"] as! String
+                                ]
+                                self.authCookies = self.session.configuration.httpCookieStorage?.cookies
+                                var accountInfo = resp["accountInfo"] as! [String: Any]
+                                var address = accountInfo["address"] as! [String: String]
+                                self.accountName = address["firstName"]! + " " + address["lastName"]!
+                                self.saveAuthInfo()
+                                ret = true
+                            } else {
+                                print("Authentication failed: \(resp["customerMessage"] as! String)")
+                            }
+                        } catch {
+                            print("Error: \(error)")
+                        }
                     }
                 }
+                datatask.resume()
+                while datatask.state != .completed {
+                    sleep(1)
+                }
+                if ret {
+                    break
+                }
+                if requestCode {
+                    ret = false
+                    break
+                }
             }
-            datatask.resume()
-            while datatask.state != .completed {
-                sleep(1)
-            }
-            if ret {
-                break
-            }
-            if requestCode {
-                ret = false
-                break
-            }
+            return ret
         }
-        return ret
+        return false
     }
 
     func volumeStoreDownloadProduct(appId: String, appVerId: String = "") -> [String: Any] {
@@ -203,7 +255,7 @@ class StoreClient {
         if appVerId != "" {
             req["externalVersionId"] = appVerId
         }
-        var url = URL(string: "https://p25-buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct?guid=\(self.guid!)")!
+        let url = URL(string: "https://p\(pod!)-buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct?guid=\(self.guid!)")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.allHTTPHeaderFields = [

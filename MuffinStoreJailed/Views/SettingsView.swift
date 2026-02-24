@@ -46,6 +46,7 @@ struct SettingsView: View {
                 Section(header: HeaderLabel(text: "Credits", icon: "person")) {
                     LinkCreditCell(image: "mineek", name: "Mineek", text: "Original Project, MuffinStore Jailed.", link: "https://github.com/mineek")
                     LinkCreditCell(image: "lunginspector", name: "lunginspector (jbdotparty)", text: "UI changes and QoL improvements.", link: "https://github.com/lunginspector")
+                    LinkCreditCell(image: "skadz", name: "Skadz (jbdotparty)", text: "Backend fixes.", link: "https://github.com/skadz108")
                 }
             }
             .navigationTitle("Settings")
