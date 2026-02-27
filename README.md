@@ -26,3 +26,4 @@ A **jailed** app store app downgrader, based off of [MuffinStoreJailed](https://
 - **App doesn't progress when clicking "log in":** You likely input the wrong Apple ID and/or Password. Kill the app from the app switcher and try again.
 - **I don't receive a 2FA code when clicking "Authenticate":** Type six random numbers into the field and log in. This likely works because you had logged into MuffinStoreJailed or PancakeStore in the past, even on a different device.
 - **The app crashes when I try to downgrade:** You likely did not purchase (download) the app in the past. Download the app beforehand and remove it, or purchase it from another device.
+- **"Safari can't open the page" error:** Go to Settings > Apps > Safari, and under "Privacy & Security," disable "Not Secure Connection Warning." Also ensure that you don't have any VPN or DNS settings that might be affecting this.
