@@ -24,8 +24,7 @@ struct DowngradeAppView: View {
                 }) {
                     Image(systemName: "doc.on.doc")
                 }
-                .buttonStyle(GlassyButtonStyle())
-                .frame(width: 50)
+                .buttonStyle(GlassyButtonStyle(useFullWidth: false))
             }
         }
     }
