@@ -1,5 +1,5 @@
 {
-  "originHash" : "4a81f1784b9a204c198def5c97c1c70048eb9b5d9b936fe5f0ecb6991ebdf4b3",
+  "originHash" : "2430244175f31ae6353f21959e37cb40e8a4bb9c29306f2aea41ea6ddfc236e8",
   "pins" : [
     {
       "identity" : "cocoaasyncsocket",
@@ -34,7 +34,7 @@
       "location" : "https://github.com/jailbreakdotparty/PartyUI",
       "state" : {
         "branch" : "main",
-        "revision" : "bdf66d81093c3268570f938f623004a9c1e710f5"
+        "revision" : "a312d167c91f5dc44feb93a5facde7847ec6900e"
       }
     },
     {

@@ -7,19 +7,6 @@
 
 import SwiftUI
 
-final class AppData: ObservableObject {
-    static let shared = AppData()
-    
-    @Published var applicationIcon: String = "xmark.circle.fill"
-    @Published var applicationIconColor: Color = .red
-    @Published var applicationStatus: String = "Not logged in"
-    
-    @Published var appBundleID: String = ""
-    @Published var appVersion: String = ""
-    
-    @Published var hasAppBeenServed: Bool = false
-}
-
 var pipe = Pipe()
 var sema = DispatchSemaphore(value: 0)
 var weOnADebugBuild: Bool = false
